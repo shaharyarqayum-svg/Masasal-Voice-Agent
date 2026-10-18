@@ -1,0 +1,6 @@
+{
+  "name": "Animation Voice Studio",
+  "description": "Text-to-Speech testing tool for creating animation voice-over and dialogue using Gemini TTS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
