@@ -12,7 +12,6 @@ import {
   ClaimPhrase,
   MaivcChecklistItem,
 } from "./types.ts";
-import { DEFAULT_CLAIM_PHRASES, DEFAULT_MAIVC_CHECKLIST } from "./utils/claimMaivc.ts";
 import SpeakerSlotManager from "./components/SpeakerSlotManager.tsx";
 import ScriptEditor from "./components/ScriptEditor.tsx";
 import LocalWavInspector from "./components/LocalWavInspector.tsx";
@@ -21,8 +20,12 @@ import SimulatedGenerationView from "./components/SimulatedGenerationView.tsx";
 import ScriptDoctorWorkspace from "./components/ScriptDoctorWorkspace.tsx";
 import PronunciationWorkspace from "./components/PronunciationWorkspace.tsx";
 import ReelProductionCopilot from "./components/ReelProductionCopilot.tsx";
-import ClaimAndMaivcWorkspace from "./components/ClaimAndMaivcWorkspace.tsx";
+import ClaimCheckerWorkspace from "./components/ClaimCheckerWorkspace.tsx";
 import { DEFAULT_PRONUNCIATION_DICTIONARY } from "./utils/pronunciationRules.ts";
+import {
+  cloneDefaultClaimPhrases,
+  cloneDefaultMaivcChecklist,
+} from "./utils/claimCompliance.ts";
 import {
   Loader2,
   AlertCircle,
@@ -36,6 +39,7 @@ import {
   Stethoscope,
   BookA,
   Film,
+  ShieldCheck,
 } from "lucide-react";
 
 const INITIAL_SPEAKER_SLOTS: SpeakerSlot[] = [
@@ -114,11 +118,11 @@ export default function App() {
   const [pronunciationOverrides, setPronunciationOverrides] = useState<PronunciationEntry[]>([]);
   const [reelScenes, setReelScenes] = useState<ReelScene[]>([]);
   const [reelSettings, setReelSettings] = useState<ReelSettings>(INITIAL_REEL_SETTINGS);
-  const [claimPhrases, setClaimPhrases] = useState<ClaimPhrase[]>(DEFAULT_CLAIM_PHRASES);
-  const [maivcChecklist, setMaivcChecklist] = useState<MaivcChecklistItem[]>(DEFAULT_MAIVC_CHECKLIST);
+  const [claimPhrases, setClaimPhrases] = useState<ClaimPhrase[]>(cloneDefaultClaimPhrases());
+  const [maivcChecklist, setMaivcChecklist] = useState<MaivcChecklistItem[]>(cloneDefaultMaivcChecklist());
 
   const [activeTab, setActiveTab] = useState<
-    "workflow" | "doctor" | "pronunciation" | "reel" | "wav" | "report" | "maivc"
+    "workflow" | "doctor" | "claims" | "pronunciation" | "reel" | "wav" | "report"
   >("workflow");
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -342,8 +346,12 @@ export default function App() {
     if (data.reelSettings) {
       setReelSettings(data.reelSettings);
     }
-    setClaimPhrases(data.claimPhrases ?? DEFAULT_CLAIM_PHRASES.map((item) => ({ ...item })));
-    setMaivcChecklist(data.maivcChecklist ?? DEFAULT_MAIVC_CHECKLIST.map((item) => ({ ...item })));
+    if (data.claimPhrases) {
+      setClaimPhrases(data.claimPhrases);
+    }
+    if (data.maivcChecklist) {
+      setMaivcChecklist(data.maivcChecklist);
+    }
     setSimulatedReport(null);
     setErrorMessage(null);
   };
@@ -355,8 +363,8 @@ export default function App() {
     setScriptLines([]);
     setPronunciationOverrides([]);
     setReelScenes([]);
-    setClaimPhrases(DEFAULT_CLAIM_PHRASES.map((item) => ({ ...item })));
-    setMaivcChecklist(DEFAULT_MAIVC_CHECKLIST.map((item) => ({ ...item })));
+    setClaimPhrases(cloneDefaultClaimPhrases());
+    setMaivcChecklist(cloneDefaultMaivcChecklist());
     setSimulatedReport(null);
     setErrorMessage(null);
   };
@@ -604,6 +612,22 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("claims")}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
+              activeTab === "claims"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Claims & MAIVC</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-900/60 text-[10px]">
+              {maivcChecklist.filter((i) => i.checked).length}/{maivcChecklist.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("pronunciation")}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
               activeTab === "pronunciation"
@@ -634,15 +658,6 @@ export default function App() {
                 {reelScenes.length}
               </span>
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("maivc")}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${activeTab === "maivc" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"}`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
-            <span>Claims & MAIVC QC</span>
           </button>
 
           <button
@@ -753,6 +768,21 @@ export default function App() {
           <ScriptDoctorWorkspace
             scriptLines={scriptLines}
             onUpdateLines={(newLines) => setScriptLines(newLines)}
+            onNavigateToClaims={() => setActiveTab("claims")}
+            disabled={isSimulating}
+          />
+        )}
+
+        {/* Tab: Product Claim Checker & MAIVC Compliance */}
+        {activeTab === "claims" && (
+          <ClaimCheckerWorkspace
+            projectTitle={projectTitle}
+            projectDescription={projectDescription}
+            scriptLines={scriptLines}
+            claimPhrases={claimPhrases}
+            maivcChecklist={maivcChecklist}
+            onUpdateClaimPhrases={setClaimPhrases}
+            onUpdateMaivcChecklist={setMaivcChecklist}
             disabled={isSimulating}
           />
         )}
@@ -779,11 +809,6 @@ export default function App() {
             onUpdateSettings={setReelSettings}
             disabled={isSimulating}
           />
-        )}
-
-        {/* Product Claim Checker and MAIVC quality-control workspace */}
-        {activeTab === "maivc" && (
-          <ClaimAndMaivcWorkspace scriptLines={scriptLines} projectTitle={projectTitle} phrases={claimPhrases} setPhrases={setClaimPhrases} checklist={maivcChecklist} setChecklist={setMaivcChecklist} />
         )}
 
         {/* Tab 5: Local Audio Inspector & Reference Preview */}

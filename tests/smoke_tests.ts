@@ -17,7 +17,27 @@ import {
   exportScenesToJson,
   exportScenesToCsv,
 } from "../src/utils/reelSplitter.ts";
-import { ProjectData, PronunciationEntry, ReelScene, ReelSettings, ScriptLine, SpeakerSlot } from "../src/types.ts";
+import {
+  ClaimPhrase,
+  MaivcChecklistItem,
+  ProjectData,
+  PronunciationEntry,
+  ReelScene,
+  ReelSettings,
+  ScriptLine,
+  SpeakerSlot,
+} from "../src/types.ts";
+import {
+  cloneDefaultClaimPhrases,
+  cloneDefaultMaivcChecklist,
+  scanScriptForClaims,
+  validateClaimPhrases,
+  validateMaivcChecklist,
+  generateComplianceReport,
+  generateComplianceReviewData,
+  generateComplianceReviewJson,
+  LEGAL_CAVEATS,
+} from "../src/utils/claimCompliance.ts";
 
 // Helper to create synthetic File in Node environment
 function createMockFile(buffer: Uint8Array, name: string, type: string): File {
@@ -308,6 +328,250 @@ async function runSmokeTests() {
     } else {
       results["22_project_export_import_preserves_all"] = "FAIL";
       results["23_invalid_json_fails_safely"] = "FAIL";
+    }
+
+    // Check 24: Claim scanning detects registered phrases in script with turn positions
+    const testClaims: ClaimPhrase[] = [
+      { id: "c1", phrase: "guaranteed", category: "Guarantee", reviewStatus: "approved", notes: "Backed by standard SLA" },
+      { id: "c2", phrase: "100%", category: "Performance", reviewStatus: "flagged", notes: "Substantiate with benchmark" },
+    ];
+    const testLinesForClaims: ScriptLine[] = [
+      { id: "cl1", speakerSlotId: "s1", text: "Our service has guaranteed uptime with 100% data retention." },
+      { id: "cl2", speakerSlotId: "s2", text: "That sounds excellent, thank you." },
+    ];
+    const claimScanResult = scanScriptForClaims(testLinesForClaims, testClaims);
+    const foundGuaranteed = claimScanResult.matches.some(
+      (m) => m.claimId === "c1" && m.turnIndex === 1 && m.matchedPhrase.toLowerCase() === "guaranteed"
+    );
+    const found100Percent = claimScanResult.matches.some(
+      (m) => m.claimId === "c2" && m.turnIndex === 1 && m.matchedPhrase === "100%"
+    );
+
+    if (foundGuaranteed && found100Percent && claimScanResult.totalMatches === 2) {
+      results["24_claim_phrase_scanning"] = "PASS";
+      console.log("✓ Check 24 PASS: Claim scanning detects registered phrases in script with turn positions");
+    } else {
+      results["24_claim_phrase_scanning"] = "FAIL";
+      console.error("✗ Check 24 FAIL:", claimScanResult);
+    }
+
+    // Check 25: JSON export/import round-trip preserves claimPhrases and maivcChecklist intact
+    const testChecklist: MaivcChecklistItem[] = [
+      { id: "m1", code: "MAIVC-01", label: "Synthetic Voice Disclosure", description: "Notice required", checked: true, notes: "Banner displayed in UI", severity: "required" },
+      { id: "m2", code: "MAIVC-02", label: "Product Claims Substantiation", description: "Verify claims", checked: false, notes: "Pending legal review", severity: "required" },
+    ];
+
+    const projectWithClaims: ProjectData = {
+      ...fullProject,
+      claimPhrases: testClaims,
+      maivcChecklist: testChecklist,
+    };
+    const serializedWithClaims = JSON.stringify(projectWithClaims);
+    const parsedWithClaims = JSON.parse(serializedWithClaims);
+
+    const validatedClaims = validateClaimPhrases(parsedWithClaims.claimPhrases);
+    const validatedChecklist = validateMaivcChecklist(parsedWithClaims.maivcChecklist);
+
+    const isClaimsRoundTripIntact =
+      validatedClaims.length === 2 &&
+      validatedClaims[0].phrase === "guaranteed" &&
+      validatedClaims[0].reviewStatus === "approved" &&
+      validatedClaims[1].reviewStatus === "flagged" &&
+      validatedChecklist.length === 2 &&
+      validatedChecklist[0].checked === true &&
+      validatedChecklist[0].notes === "Banner displayed in UI" &&
+      validatedChecklist[1].checked === false;
+
+    if (isClaimsRoundTripIntact) {
+      results["25_json_roundtrip_includes_claims_and_maivc"] = "PASS";
+      console.log("✓ Check 25 PASS: JSON export/import round-trip preserves claimPhrases and maivcChecklist intact");
+    } else {
+      results["25_json_roundtrip_includes_claims_and_maivc"] = "FAIL";
+      console.error("✗ Check 25 FAIL:", { validatedClaims, validatedChecklist });
+    }
+
+    // Check 26: Backward compatibility: Legacy project JSON without claim/checklist fields safely adopts defaults
+    const legacyProjectJson = {
+      version: "1.0.0",
+      title: "Legacy Project",
+      description: "Older project format before Claims/MAIVC",
+      speakerSlots: fullProject.speakerSlots,
+      scriptLines: fullProject.scriptLines,
+      // claimPhrases and maivcChecklist are undefined!
+    };
+    const legacyClaims = validateClaimPhrases((legacyProjectJson as any).claimPhrases);
+    const legacyChecklist = validateMaivcChecklist((legacyProjectJson as any).maivcChecklist);
+
+    const isLegacyCompatible =
+      Array.isArray(legacyClaims) &&
+      legacyClaims.length >= 8 &&
+      legacyClaims.every((c) => c.reviewStatus === "unreviewed") &&
+      Array.isArray(legacyChecklist) &&
+      legacyChecklist.length >= 6 &&
+      legacyChecklist.every((item) => item.checked === false);
+
+    if (isLegacyCompatible) {
+      results["26_legacy_project_backward_compatibility"] = "PASS";
+      console.log("✓ Check 26 PASS: Legacy project JSON safely adopts defaults for missing claim & checklist fields");
+    } else {
+      results["26_legacy_project_backward_compatibility"] = "FAIL";
+      console.error("✗ Check 26 FAIL:", { legacyClaims, legacyChecklist });
+    }
+
+    // Check 27: Strict validation safety: Malformed claim or checklist structures throw error, preventing partial overwrite
+    let caughtInvalidClaims = false;
+    let caughtInvalidChecklist = false;
+
+    try {
+      validateClaimPhrases("not an array");
+    } catch {
+      caughtInvalidClaims = true;
+    }
+
+    try {
+      validateMaivcChecklist("not an array");
+    } catch {
+      caughtInvalidChecklist = true;
+    }
+
+    if (caughtInvalidClaims && caughtInvalidChecklist) {
+      results["27_invalid_import_validation_safety"] = "PASS";
+      console.log("✓ Check 27 PASS: Malformed claims/checklist reject safely and prevent partial project overwrite");
+    } else {
+      results["27_invalid_import_validation_safety"] = "FAIL";
+      console.error("✗ Check 27 FAIL: Validation did not throw on invalid input.");
+    }
+
+    // Check 28: Compliance review report generator contains mandatory disclaimers, summary metrics, and checklist breakdown
+    const reportText = generateComplianceReport(
+      "Test Project",
+      "Compliance testing",
+      testLinesForClaims,
+      testClaims,
+      testChecklist
+    );
+
+    const hasReportTitle = reportText.includes("MASASAL VOICE AGENT — PRODUCT CLAIM & MAIVC COMPLIANCE REVIEW REPORT");
+    const hasMandatoryDisclaimer = reportText.includes("Local rule-based tool – no model connected");
+    const hasChecklistSummary = reportText.includes("MAIVC Checklist Progress");
+    const hasDetectedHits = reportText.includes("Turn #1");
+
+    if (hasReportTitle && hasMandatoryDisclaimer && hasChecklistSummary && hasDetectedHits) {
+      results["28_compliance_report_generation"] = "PASS";
+      console.log("✓ Check 28 PASS: Compliance review report generator validates formatted export and disclaimers");
+    } else {
+      results["28_compliance_report_generation"] = "FAIL";
+      console.error("✗ Check 28 FAIL: Report missing required sections.");
+    }
+
+    // Check 29: Compliance Review JSON export includes script lines, claim matches with character locations, review states/notes, checklist states/notes, warnings, and legal caveats
+    const reviewJsonStr = generateComplianceReviewJson(
+      "Masasal Reel Campaign",
+      "Instagram Reel voice agent dialogue",
+      testLinesForClaims,
+      testClaims,
+      testChecklist
+    );
+    const parsedReviewJson = JSON.parse(reviewJsonStr);
+
+    const hasValidJsonHeader =
+      parsedReviewJson.version === "1.0.0" &&
+      typeof parsedReviewJson.generatedAt === "string" &&
+      parsedReviewJson.project?.title === "Masasal Reel Campaign" &&
+      parsedReviewJson.ruleLabel === "Local rule-based tool – no model connected";
+
+    const hasMatchesWithLocations =
+      Array.isArray(parsedReviewJson.claimMatches) &&
+      parsedReviewJson.claimMatches.length > 0 &&
+      parsedReviewJson.claimMatches.every(
+        (m: any) =>
+          typeof m.startIndex === "number" &&
+          typeof m.endIndex === "number" &&
+          m.endIndex > m.startIndex &&
+          typeof m.matchedPhrase === "string" &&
+          typeof m.reviewStatus === "string"
+      );
+
+    const hasClaimsWithStatusesAndNotes =
+      Array.isArray(parsedReviewJson.claimPhrases) &&
+      parsedReviewJson.claimPhrases.length === testClaims.length &&
+      parsedReviewJson.claimPhrases.some((c: any) => c.reviewStatus === "approved" && typeof c.notes === "string");
+
+    const hasChecklistWithStatesAndNotes =
+      Array.isArray(parsedReviewJson.maivcChecklist) &&
+      parsedReviewJson.maivcChecklist.length === testChecklist.length &&
+      parsedReviewJson.maivcChecklist.some((item: any) => item.checked === true && typeof item.notes === "string");
+
+    const hasWarningsAndCaveats =
+      Array.isArray(parsedReviewJson.uncheckedWarnings) &&
+      parsedReviewJson.uncheckedWarnings.length > 0 &&
+      Array.isArray(parsedReviewJson.legalCaveats) &&
+      parsedReviewJson.legalCaveats.length >= 4;
+
+    if (
+      hasValidJsonHeader &&
+      hasMatchesWithLocations &&
+      hasClaimsWithStatusesAndNotes &&
+      hasChecklistWithStatesAndNotes &&
+      hasWarningsAndCaveats
+    ) {
+      results["29_compliance_review_json_export"] = "PASS";
+      console.log("✓ Check 29 PASS: Compliance Review JSON export includes script lines, claim locations, review statuses/notes, checklist, warnings, and legal caveats");
+    } else {
+      results["29_compliance_review_json_export"] = "FAIL";
+      console.error("✗ Check 29 FAIL:", {
+        hasValidJsonHeader,
+        hasMatchesWithLocations,
+        hasClaimsWithStatusesAndNotes,
+        hasChecklistWithStatesAndNotes,
+        hasWarningsAndCaveats,
+      });
+    }
+
+    // Check 30: GitHub legacy field normalization (reviewed boolean and note singular) into reviewStatus and notes
+    const githubLegacyClaimsInput = [
+      { id: "gh-c1", phrase: "revolutionary", reviewed: true, note: "Approved in GitHub" },
+      { id: "gh-c2", phrase: "guaranteed", reviewed: false, note: "Unreviewed in GitHub" },
+      { id: "gh-c3", phrase: "instant", reviewStatus: "flagged", notes: "Flagged in AI Studio" },
+    ];
+
+    const normalizedClaims = validateClaimPhrases(githubLegacyClaimsInput);
+
+    const githubLegacyChecklistInput = [
+      { id: "gh-m1", label: "Synthetic Voice Disclosure", description: "Mandatory notice", checked: true, note: "Legacy singular note" },
+      { id: "gh-m2", label: "Product Claims Substantiation", description: "Grounded in spec", checked: false },
+    ];
+
+    const normalizedChecklist = validateMaivcChecklist(githubLegacyChecklistInput);
+
+    const isLegacyGitHubClaimsValid =
+      normalizedClaims.length === 3 &&
+      normalizedClaims[0].reviewStatus === "approved" &&
+      normalizedClaims[0].reviewed === true &&
+      normalizedClaims[0].notes === "Approved in GitHub" &&
+      normalizedClaims[0].note === "Approved in GitHub" &&
+      normalizedClaims[1].reviewStatus === "unreviewed" &&
+      normalizedClaims[1].reviewed === false &&
+      normalizedClaims[2].reviewStatus === "flagged" &&
+      normalizedClaims[2].notes === "Flagged in AI Studio";
+
+    const isLegacyGitHubChecklistValid =
+      normalizedChecklist.length === 2 &&
+      normalizedChecklist[0].checked === true &&
+      normalizedChecklist[0].notes === "Legacy singular note" &&
+      normalizedChecklist[0].note === "Legacy singular note" &&
+      normalizedChecklist[0].code === "MAIVC-01" &&
+      normalizedChecklist[0].severity === "required" &&
+      normalizedChecklist[1].checked === false &&
+      normalizedChecklist[1].notes === "" &&
+      normalizedChecklist[1].code === "MAIVC-02";
+
+    if (isLegacyGitHubClaimsValid && isLegacyGitHubChecklistValid) {
+      results["30_github_legacy_fields_compatibility"] = "PASS";
+      console.log("✓ Check 30 PASS: GitHub legacy fields (reviewed boolean, note singular) safely normalize to reviewStatus and notes without data loss");
+    } else {
+      results["30_github_legacy_fields_compatibility"] = "FAIL";
+      console.error("✗ Check 30 FAIL:", { normalizedClaims, normalizedChecklist });
     }
 
     console.log("\n=== ALL TEST CHECKS COMPLETED ===");

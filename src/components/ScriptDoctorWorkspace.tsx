@@ -29,12 +29,14 @@ interface ScriptDoctorWorkspaceProps {
   scriptLines: ScriptLine[];
   onUpdateLines: (newLines: ScriptLine[]) => void;
   disabled?: boolean;
+  onNavigateToClaims?: () => void;
 }
 
 export default function ScriptDoctorWorkspace({
   scriptLines,
   onUpdateLines,
   disabled = false,
+  onNavigateToClaims,
 }: ScriptDoctorWorkspaceProps) {
   // Target line selection: "all" or specific line id
   const [selectedTarget, setSelectedTarget] = useState<string>("all");
@@ -362,6 +364,16 @@ export default function ScriptDoctorWorkspace({
                   </div>
                 ))}
               </div>
+            )}
+
+            {onNavigateToClaims && (
+              <button
+                type="button"
+                onClick={onNavigateToClaims}
+                className="mt-1 text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer self-start transition-colors"
+              >
+                <span>Track in Product Claims & MAIVC Workspace →</span>
+              </button>
             )}
           </div>
         </div>

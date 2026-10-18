@@ -60,17 +60,80 @@ export interface ReelSettings {
   defaultPauseSec: number; // default 0.4
 }
 
+export type ClaimReviewStatus = "unreviewed" | "approved" | "flagged" | "rejected";
+
 export interface ClaimPhrase {
   id: string;
   phrase: string;
-  reviewed: boolean;
+  category?: string;
+  reviewStatus: ClaimReviewStatus;
+  reviewed?: boolean;
+  notes?: string;
+  note?: string;
 }
 
 export interface MaivcChecklistItem {
   id: string;
+  code: string;
   label: string;
+  description: string;
   checked: boolean;
-  note: string;
+  notes: string;
+  note?: string;
+  severity: "required" | "recommended" | "advisory";
+}
+
+export interface ScriptClaimMatch {
+  lineId: string;
+  turnIndex: number;
+  speakerSlotId: string;
+  matchedPhrase: string;
+  claimId: string;
+  contextText: string;
+  reviewStatus: ClaimReviewStatus;
+  startIndex: number;
+  endIndex: number;
+}
+
+export interface ScriptClaimMatchLocation {
+  startIndex: number;
+  endIndex: number;
+}
+
+export interface ComplianceReviewJsonData {
+  version: "1.0.0";
+  generatedAt: string;
+  project: {
+    title: string;
+    description: string;
+  };
+  isolation: string;
+  ruleLabel: string;
+  summary: {
+    maivcProgress: {
+      total: number;
+      checked: number;
+      percentage: number;
+      fullyCompliant: boolean;
+    };
+    claimsSummary: {
+      total: number;
+      approved: number;
+      flagged: number;
+      rejected: number;
+      unreviewed: number;
+    };
+    scriptMatchesSummary: {
+      totalMatches: number;
+      scriptLineCount: number;
+    };
+  };
+  scriptLines: ScriptLine[];
+  claimPhrases: Array<ClaimPhrase & { matchCount: number }>;
+  claimMatches: Array<ScriptClaimMatch & ScriptClaimMatchLocation>;
+  maivcChecklist: MaivcChecklistItem[];
+  uncheckedWarnings: string[];
+  legalCaveats: string[];
 }
 
 export interface ProjectData {
