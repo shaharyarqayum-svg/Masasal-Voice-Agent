@@ -60,7 +60,7 @@ export interface ReelSettings {
   defaultPauseSec: number; // default 0.4
 }
 
-export interface ProjectData {
+export interface ClaimPhrase {\n  id: string;\n  phrase: string;\n  reviewed: boolean;\n}\n\nexport interface MaivcChecklistItem {\n  id: string;\n  label: string;\n  checked: boolean;\n  note: string;\n}\n\nexport interface ProjectData {
   version: "1.0.0";
   title: string;
   description: string;
@@ -69,7 +69,7 @@ export interface ProjectData {
   pronunciationDictionary?: PronunciationEntry[];
   pronunciationOverrides?: PronunciationEntry[];
   reelScenes?: ReelScene[];
-  reelSettings?: ReelSettings;
+  reelSettings?: ReelSettings;\n  claimPhrases?: ClaimPhrase[];\n  maivcChecklist?: MaivcChecklistItem[];
   exportedAt: string;
 }
 
