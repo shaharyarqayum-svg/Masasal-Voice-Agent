@@ -538,6 +538,8 @@ export default function App() {
           pronunciationOverrides={pronunciationOverrides}
           reelScenes={reelScenes}
           reelSettings={reelSettings}
+          claimPhrases={claimPhrases}
+          maivcChecklist={maivcChecklist}
           onImportProject={handleImportProject}
           onResetProject={handleResetProject}
           disabled={isSimulating}
