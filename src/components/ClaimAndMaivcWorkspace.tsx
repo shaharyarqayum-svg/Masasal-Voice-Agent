@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Dispatch, SetStateAction, useMemo, useState } from "react";
 import { ClaimPhrase, MaivcChecklistItem, ScriptLine } from "../types.ts";
 
 import { DEFAULT_CLAIM_PHRASES, DEFAULT_MAIVC_CHECKLIST } from "../utils/claimMaivc.ts";
