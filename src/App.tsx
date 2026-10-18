@@ -18,6 +18,7 @@ import SimulatedGenerationView from "./components/SimulatedGenerationView.tsx";
 import ScriptDoctorWorkspace from "./components/ScriptDoctorWorkspace.tsx";
 import PronunciationWorkspace from "./components/PronunciationWorkspace.tsx";
 import ReelProductionCopilot from "./components/ReelProductionCopilot.tsx";
+import ClaimAndMaivcWorkspace from "./components/ClaimAndMaivcWorkspace.tsx";
 import { DEFAULT_PRONUNCIATION_DICTIONARY } from "./utils/pronunciationRules.ts";
 import {
   Loader2,
@@ -112,7 +113,7 @@ export default function App() {
   const [reelSettings, setReelSettings] = useState<ReelSettings>(INITIAL_REEL_SETTINGS);
 
   const [activeTab, setActiveTab] = useState<
-    "workflow" | "doctor" | "pronunciation" | "reel" | "wav" | "report"
+    "workflow" | "doctor" | "pronunciation" | "reel" | "wav" | "report" | "maivc"
   >("workflow");
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -626,6 +627,15 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("maivc")}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${activeTab === "maivc" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"}`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-300" />
+            <span>Claims & MAIVC QC</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("wav")}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
               activeTab === "wav"
@@ -758,6 +768,11 @@ export default function App() {
             onUpdateSettings={setReelSettings}
             disabled={isSimulating}
           />
+        )}
+
+        {/* Product Claim Checker and MAIVC quality-control workspace */}
+        {activeTab === "maivc" && (
+          <ClaimAndMaivcWorkspace scriptLines={scriptLines} projectTitle={projectTitle} />
         )}
 
         {/* Tab 5: Local Audio Inspector & Reference Preview */}
