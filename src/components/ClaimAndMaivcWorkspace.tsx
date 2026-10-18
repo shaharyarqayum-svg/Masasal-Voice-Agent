@@ -13,7 +13,7 @@ function phraseRegex(phrase: string): RegExp {
   return new RegExp("(^|[^\\p{L}\\p{N}])(" + core + ")(?=$|[^\\p{L}\\p{N}])", "giu");
 }
 
-export default function ClaimAndMaivcWorkspace({ scriptLines, projectTitle, phrases, setPhrases, checklist, setChecklist }: { scriptLines: ScriptLine[]; projectTitle: string; phrases: ClaimPhrase[]; setPhrases: React.Dispatch<React.SetStateAction<ClaimPhrase[]>>; checklist: MaivcChecklistItem[]; setChecklist: React.Dispatch<React.SetStateAction<MaivcChecklistItem[]>> }) {
+export default function ClaimAndMaivcWorkspace({ scriptLines, projectTitle, phrases, setPhrases, checklist, setChecklist }: { scriptLines: ScriptLine[]; projectTitle: string; phrases: ClaimPhrase[]; setPhrases: Dispatch<SetStateAction<ClaimPhrase[]>>; checklist: MaivcChecklistItem[]; setChecklist: Dispatch<SetStateAction<MaivcChecklistItem[]>> }) {
   const [newPhrase, setNewPhrase] = useState("");
   const [exportNotice, setExportNotice] = useState("");
   const script = scriptLines.map((line, index) => ({ turn: index + 1, text: line.text, id: line.id }));
