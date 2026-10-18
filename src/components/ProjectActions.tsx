@@ -1,6 +1,7 @@
 import { useRef, useState, ChangeEvent } from "react";
 import { Download, Upload, RotateCcw, Check, AlertCircle, AlertTriangle, ShieldCheck } from "lucide-react";
-import { ProjectData, ScriptLine, SpeakerSlot, PronunciationEntry, ReelScene, ReelSettings } from "../types.ts";
+import { ProjectData, ScriptLine, SpeakerSlot, PronunciationEntry, ReelScene, ReelSettings, ClaimPhrase, MaivcChecklistItem } from "../types.ts";
+import { DEFAULT_CLAIM_PHRASES, DEFAULT_MAIVC_CHECKLIST } from "../utils/claimMaivc.ts";
 
 interface ProjectActionsProps {
   projectTitle: string;
@@ -11,6 +12,8 @@ interface ProjectActionsProps {
   pronunciationOverrides: PronunciationEntry[];
   reelScenes: ReelScene[];
   reelSettings: ReelSettings;
+  claimPhrases: ClaimPhrase[];
+  maivcChecklist: MaivcChecklistItem[];
   onImportProject: (data: ProjectData) => void;
   onResetProject: () => void;
   disabled?: boolean;
@@ -25,6 +28,8 @@ export default function ProjectActions({
   pronunciationOverrides,
   reelScenes,
   reelSettings,
+  claimPhrases,
+  maivcChecklist,
   onImportProject,
   onResetProject,
   disabled = false,
@@ -47,6 +52,8 @@ export default function ProjectActions({
         pronunciationOverrides,
         reelScenes,
         reelSettings,
+        claimPhrases,
+        maivcChecklist,
         exportedAt: new Date().toISOString(),
       };
 
@@ -192,6 +199,24 @@ export default function ProjectActions({
               : 0.4,
         };
 
+        const validatedClaimPhrases: ClaimPhrase[] = Array.isArray(parsed.claimPhrases)
+          ? parsed.claimPhrases.map((p: any, idx: number) => {
+              if (typeof p.phrase !== "string" || typeof p.reviewed !== "boolean") {
+                throw new Error(`Claim phrase #${idx + 1} is invalid.`);
+              }
+              return { id: String(p.id || `claim-${idx}`), phrase: p.phrase, reviewed: p.reviewed };
+            })
+          : DEFAULT_CLAIM_PHRASES.map((item) => ({ ...item }));
+
+        const validatedMaivcChecklist: MaivcChecklistItem[] = Array.isArray(parsed.maivcChecklist)
+          ? parsed.maivcChecklist.map((item: any, idx: number) => {
+              if (typeof item.label !== "string" || typeof item.checked !== "boolean") {
+                throw new Error(`MAIVC checklist item #${idx + 1} is invalid.`);
+              }
+              return { id: String(item.id || `maivc-${idx}`), label: item.label, checked: item.checked, note: String(item.note || "") };
+            })
+          : DEFAULT_MAIVC_CHECKLIST.map((item) => ({ ...item }));
+
         const validatedProject: ProjectData = {
           version: "1.0.0",
           title: String(parsed.title || "Imported Voice Agent Project"),
@@ -202,6 +227,8 @@ export default function ProjectActions({
           pronunciationOverrides: validatedOverrides,
           reelScenes: validatedScenes,
           reelSettings: validatedSettings,
+          claimPhrases: validatedClaimPhrases,
+          maivcChecklist: validatedMaivcChecklist,
           exportedAt: parsed.exportedAt || new Date().toISOString(),
         };
 
