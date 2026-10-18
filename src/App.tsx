@@ -9,7 +9,10 @@ import {
   PronunciationEntry,
   ReelScene,
   ReelSettings,
+  ClaimPhrase,
+  MaivcChecklistItem,
 } from "./types.ts";
+import { DEFAULT_CLAIM_PHRASES, DEFAULT_MAIVC_CHECKLIST } from "./utils/claimMaivc.ts";
 import SpeakerSlotManager from "./components/SpeakerSlotManager.tsx";
 import ScriptEditor from "./components/ScriptEditor.tsx";
 import LocalWavInspector from "./components/LocalWavInspector.tsx";
@@ -111,6 +114,8 @@ export default function App() {
   const [pronunciationOverrides, setPronunciationOverrides] = useState<PronunciationEntry[]>([]);
   const [reelScenes, setReelScenes] = useState<ReelScene[]>([]);
   const [reelSettings, setReelSettings] = useState<ReelSettings>(INITIAL_REEL_SETTINGS);
+  const [claimPhrases, setClaimPhrases] = useState<ClaimPhrase[]>(DEFAULT_CLAIM_PHRASES);
+  const [maivcChecklist, setMaivcChecklist] = useState<MaivcChecklistItem[]>(DEFAULT_MAIVC_CHECKLIST);
 
   const [activeTab, setActiveTab] = useState<
     "workflow" | "doctor" | "pronunciation" | "reel" | "wav" | "report" | "maivc"
@@ -337,6 +342,8 @@ export default function App() {
     if (data.reelSettings) {
       setReelSettings(data.reelSettings);
     }
+    setClaimPhrases(data.claimPhrases ?? DEFAULT_CLAIM_PHRASES.map((item) => ({ ...item })));
+    setMaivcChecklist(data.maivcChecklist ?? DEFAULT_MAIVC_CHECKLIST.map((item) => ({ ...item })));
     setSimulatedReport(null);
     setErrorMessage(null);
   };
@@ -348,6 +355,8 @@ export default function App() {
     setScriptLines([]);
     setPronunciationOverrides([]);
     setReelScenes([]);
+    setClaimPhrases(DEFAULT_CLAIM_PHRASES.map((item) => ({ ...item })));
+    setMaivcChecklist(DEFAULT_MAIVC_CHECKLIST.map((item) => ({ ...item })));
     setSimulatedReport(null);
     setErrorMessage(null);
   };
@@ -772,7 +781,7 @@ export default function App() {
 
         {/* Product Claim Checker and MAIVC quality-control workspace */}
         {activeTab === "maivc" && (
-          <ClaimAndMaivcWorkspace scriptLines={scriptLines} projectTitle={projectTitle} />
+          <ClaimAndMaivcWorkspace scriptLines={scriptLines} projectTitle={projectTitle} phrases={claimPhrases} setPhrases={setClaimPhrases} checklist={maivcChecklist} setChecklist={setMaivcChecklist} />
         )}
 
         {/* Tab 5: Local Audio Inspector & Reference Preview */}
