@@ -1,25 +1,7 @@
 import { useMemo, useState } from "react";
-import { ScriptLine } from "../types.ts";
+import { ClaimPhrase, MaivcChecklistItem, ScriptLine } from "../types.ts";
 
-type ClaimPhrase = { id: string; phrase: string; reviewed: boolean };
-type ChecklistItem = { id: string; label: string; checked: boolean; note: string };
-
-const DEFAULT_PHRASES = [
-  "guaranteed", "clinically proven", "instant results", "cure", "permanent results",
-  "100% effective", "zero side effects",
-];
-const CHECKLIST_LABELS = [
-  "Exact product name, size and variant verified",
-  "Current price/offer checked against an authoritative current source",
-  "Product availability confirmed",
-  "Claims checked against authoritative product information",
-  "No invented product facts, results, testimonials or unsupported demonstrations",
-  "Pronunciation and delivery reviewed",
-  "On-screen text and captions checked",
-  "CTA clear and appropriate",
-  "Final rendered video, audio and captions reviewed",
-  "Owner final approval obtained",
-];
+import { DEFAULT_CLAIM_PHRASES, DEFAULT_MAIVC_CHECKLIST } from "../utils/claimMaivc.ts";
 const idFor = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 function phraseRegex(phrase: string): RegExp {
@@ -31,10 +13,8 @@ function phraseRegex(phrase: string): RegExp {
   return new RegExp("(^|[^\\p{L}\\p{N}])(" + core + ")(?=$|[^\\p{L}\\p{N}])", "giu");
 }
 
-export default function ClaimAndMaivcWorkspace({ scriptLines, projectTitle }: { scriptLines: ScriptLine[]; projectTitle: string }) {
-  const [phrases, setPhrases] = useState<ClaimPhrase[]>(() => DEFAULT_PHRASES.map(p => ({ id: idFor(p), phrase: p, reviewed: false })));
+export default function ClaimAndMaivcWorkspace({ scriptLines, projectTitle, phrases, setPhrases, checklist, setChecklist }: { scriptLines: ScriptLine[]; projectTitle: string; phrases: ClaimPhrase[]; setPhrases: React.Dispatch<React.SetStateAction<ClaimPhrase[]>>; checklist: MaivcChecklistItem[]; setChecklist: React.Dispatch<React.SetStateAction<MaivcChecklistItem[]>> }) {
   const [newPhrase, setNewPhrase] = useState("");
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(() => CHECKLIST_LABELS.map((label, i) => ({ id: "maivc-" + i, label, checked: false, note: "" })));
   const [exportNotice, setExportNotice] = useState("");
   const script = scriptLines.map((line, index) => ({ turn: index + 1, text: line.text, id: line.id }));
   const matches = useMemo(() => {
